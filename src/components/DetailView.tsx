@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ContentItem, Comment } from '@/lib/types';
-import { timeAgo, CONTENT_TYPE_CONFIG } from '@/lib/utils';
+import { timeAgo, CONTENT_TYPE_CONFIG, decodeHtml } from '@/lib/utils';
 
 interface DetailViewProps {
   item: ContentItem;
@@ -114,7 +114,7 @@ export default function DetailView({
           </div>
 
           <h1 className="text-xl font-bold text-base-content leading-snug mb-3">
-            {item.headline}
+            {decodeHtml(item.headline)}
           </h1>
 
           {item.summary && (

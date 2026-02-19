@@ -40,6 +40,15 @@ export const CONTENT_TYPE_CONFIG = {
   },
 } as const;
 
+// Decode HTML entities (YouTube API returns encoded titles)
+export function decodeHtml(text: string): string {
+  const entities: Record<string, string> = {
+    '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"',
+    '&#39;': "'", '&#x27;': "'", '&apos;': "'", '&#x2F;': '/',
+  };
+  return text.replace(/&(?:#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (m) => entities[m] || m);
+}
+
 // Truncate text to a max length
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;

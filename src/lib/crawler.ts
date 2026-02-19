@@ -19,12 +19,25 @@ export interface CrawledItem {
   source_published_at: string | null;
 }
 
+function resolveItemUrl(item: any, source: Source): string {
+  if (item.link && item.link.startsWith('http')) {
+    return item.link;
+  }
+
+  if (source.content_type === 'podcast' && item.title) {
+    const query = encodeURIComponent(`${source.name} ${item.title}`);
+    return `https://open.spotify.com/search/${query}`;
+  }
+
+  return item.enclosure?.url || item.guid || '';
+}
+
 // Crawl an RSS feed (articles and podcasts)
 async function crawlRSS(source: Source): Promise<CrawledItem[]> {
   try {
     const feed = await rssParser.parseURL(source.url);
     return (feed.items || []).slice(0, 20).map((item) => ({
-      url: item.link || item.guid || '',
+      url: resolveItemUrl(item, source),
       headline: item.title || 'Untitled',
       content: item.contentSnippet || item.content || item.summary || item.title || '',
       author: item.creator || item.author || null,

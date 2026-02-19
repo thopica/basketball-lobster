@@ -1,7 +1,7 @@
 'use client';
 
 import { ContentItem } from '@/lib/types';
-import { timeAgo, CONTENT_TYPE_CONFIG } from '@/lib/utils';
+import { timeAgo, CONTENT_TYPE_CONFIG, decodeHtml } from '@/lib/utils';
 
 interface ContentCardProps {
   item: ContentItem;
@@ -65,7 +65,7 @@ export default function ContentCard({ item, onVote, onSelect }: ContentCardProps
           }}
           className="text-[15px] font-semibold text-base-content hover:text-primary transition-colors leading-snug block mb-1 no-underline"
         >
-          {item.headline}
+          {decodeHtml(item.headline)}
         </a>
 
         {/* Summary */}

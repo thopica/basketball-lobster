@@ -3,6 +3,36 @@ import { createAdminClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
+function diversifyFeed(items: any[]): any[] {
+  if (items.length <= 2) return items;
+
+  const result: any[] = [];
+  const remaining = [...items];
+
+  while (remaining.length > 0) {
+    const prev1 = result[result.length - 1];
+    const prev2 = result[result.length - 2];
+
+    const idx = remaining.findIndex((item) => {
+      const sameSource =
+        prev1?.source_name === item.source_name &&
+        prev2?.source_name === item.source_name;
+      const sameType =
+        prev1?.content_type === item.content_type &&
+        prev2?.content_type === item.content_type;
+      return !sameSource && !sameType;
+    });
+
+    if (idx >= 0) {
+      result.push(remaining.splice(idx, 1)[0]);
+    } else {
+      result.push(remaining.shift()!);
+    }
+  }
+
+  return result;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const sort = searchParams.get('sort') || 'hot';
@@ -83,6 +113,8 @@ export async function GET(request: NextRequest) {
         })
         .sort((a: any, b: any) => b.hot_score - a.hot_score);
     }
+
+    items = diversifyFeed(items);
 
     // If user is logged in, check which items they've voted on
     if (userId) {
