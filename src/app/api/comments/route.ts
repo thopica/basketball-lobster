@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createRouteClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
+  const authClient = createRouteClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createAdminClient();
 
   try {
-    const { content_id, user_id, body, parent_id } = await request.json();
+    const { content_id, body, parent_id } = await request.json();
 
-    if (!content_id || !user_id || !body?.trim()) {
+    if (!content_id || !body?.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -15,7 +22,7 @@ export async function POST(request: NextRequest) {
       .from('comments')
       .insert({
         content_id,
-        user_id,
+        user_id: user.id,
         body: body.trim(),
         parent_id: parent_id || null,
       })

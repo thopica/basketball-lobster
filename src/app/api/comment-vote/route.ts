@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createRouteClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
+  const authClient = createRouteClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createAdminClient();
 
   try {
-    const { comment_id, user_id } = await request.json();
+    const { comment_id } = await request.json();
 
-    if (!comment_id || !user_id) {
-      return NextResponse.json({ error: 'Missing comment_id or user_id' }, { status: 400 });
+    if (!comment_id) {
+      return NextResponse.json({ error: 'Missing comment_id' }, { status: 400 });
     }
 
     const { data: existingVote } = await supabase
       .from('comment_votes')
       .select('id')
-      .eq('user_id', user_id)
+      .eq('user_id', user.id)
       .eq('comment_id', comment_id)
       .single();
 
@@ -24,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error } = await supabase.from('comment_votes').insert({
-      user_id,
+      user_id: user.id,
       comment_id,
     });
 

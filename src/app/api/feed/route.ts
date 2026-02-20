@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createRouteClient } from '@/lib/supabase-server';
+import { calculateHotScore } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,16 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
   const topPeriod = searchParams.get('top_period') || 'today';
-  const userId = searchParams.get('user_id') || null;
+
+  // Derive user from session cookie (no client-provided user_id)
+  let userId: string | null = null;
+  try {
+    const authClient = createRouteClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    userId = user?.id ?? null;
+  } catch {
+    // Not logged in — that's fine for a read-only route
+  }
 
   const offset = (page - 1) * limit;
   const supabase = createAdminClient();
@@ -51,18 +61,15 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .eq('published', true);
 
-    // Filter by content type
     if (type !== 'all') {
       query = query.eq('content_type', type);
     }
 
-    // Sort
     switch (sort) {
       case 'new':
         query = query.order('created_at', { ascending: false });
         break;
       case 'top': {
-        // Filter by time period
         const now = new Date();
         let since: Date;
         switch (topPeriod) {
@@ -72,7 +79,7 @@ export async function GET(request: NextRequest) {
           case 'month':
             since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             break;
-          default: // today
+          default:
             since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         }
         query = query
@@ -82,10 +89,8 @@ export async function GET(request: NextRequest) {
       }
       case 'hot':
       default:
-        // For hot, we fetch recent items and sort client-side using the algorithm
-        // (Supabase doesn't support computed column sorting)
         query = query
-          .gte('created_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
+          .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: false });
         break;
     }
@@ -100,15 +105,15 @@ export async function GET(request: NextRequest) {
 
     let items = content || [];
 
-    // Apply hot ranking algorithm if sort=hot
     if (sort === 'hot') {
       items = items
         .map((item) => {
-          const hoursAge =
-            (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60);
-          const hotScore =
-            (item.vote_count + (item.ai_quality_score || 5)) /
-            Math.pow(hoursAge + 2, 1.5);
+          const hotScore = calculateHotScore(
+            item.vote_count,
+            item.ai_quality_score || 5,
+            item.created_at,
+            item.content_type
+          );
           return { ...item, hot_score: hotScore };
         })
         .sort((a: any, b: any) => b.hot_score - a.hot_score);
@@ -116,7 +121,6 @@ export async function GET(request: NextRequest) {
 
     items = diversifyFeed(items);
 
-    // If user is logged in, check which items they've voted on
     if (userId) {
       const contentIds = items.map((i) => i.id);
       const { data: userVotes } = await supabase

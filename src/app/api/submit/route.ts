@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createRouteClient } from '@/lib/supabase-server';
 import { curateContent } from '@/lib/ai-curator';
 
 export async function POST(request: NextRequest) {
+  const authClient = createRouteClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createAdminClient();
 
   try {
-    const { url, content_type, user_id } = await request.json();
+    const { url, content_type } = await request.json();
 
-    if (!url || !content_type || !user_id) {
+    if (!url || !content_type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check for duplicate URL
     const { data: existing } = await supabase
       .from('content')
       .select('id')
@@ -23,7 +29,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This URL has already been submitted' }, { status: 409 });
     }
 
-    // Try to fetch page title from URL
     let headline = url;
     let contentText = '';
     try {
@@ -34,17 +39,15 @@ export async function POST(request: NextRequest) {
       const html = await res.text();
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       if (titleMatch) headline = titleMatch[1].trim();
-      // Extract meta description
       const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
       if (descMatch) contentText = descMatch[1];
     } catch {
       // If fetch fails, use URL as headline
     }
 
-    // AI Curation
     const aiResult = await curateContent(headline, 'User Submission', contentText || headline);
 
-    const published = aiResult.score >= 4; // Lower threshold for user submissions
+    const published = aiResult.score >= 4;
     const needsReview = aiResult.score < 6;
 
     const { data: content, error } = await supabase
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest) {
         ai_quality_score: aiResult.score,
         ai_score_reason: aiResult.reason,
         is_user_submitted: true,
-        submitted_by: user_id,
+        submitted_by: user.id,
         published,
         needs_review: needsReview,
       })

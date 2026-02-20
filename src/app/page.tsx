@@ -63,7 +63,6 @@ export default function HomePage() {
         type: filter,
         page: page.toString(),
         limit: '30',
-        ...(user?.id ? { user_id: user.id } : {}),
       });
       const res = await fetch(`/api/feed?${params}`);
       const data = await res.json();
@@ -78,7 +77,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [sort, filter, page, user?.id]);
+  }, [sort, filter, page]);
 
   useEffect(() => {
     setPage(1);
@@ -120,7 +119,7 @@ export default function HomePage() {
     await fetch('/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_id: contentId, user_id: user.id }),
+      body: JSON.stringify({ content_id: contentId }),
     });
   };
 
@@ -128,8 +127,7 @@ export default function HomePage() {
   const handleSelect = async (item: ContentItem) => {
     setSelectedItem(item);
     try {
-      const params = user?.id ? `?user_id=${user.id}` : '';
-      const res = await fetch(`/api/content/${item.id}${params}`);
+      const res = await fetch(`/api/content/${item.id}`);
       const data = await res.json();
       setSelectedItem(data.content);
       setDetailComments(data.comments || []);
@@ -146,14 +144,13 @@ export default function HomePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content_id: selectedItem.id,
-        user_id: user.id,
         body,
         parent_id: parentId,
       }),
     });
     if (res.ok) {
       // Refresh comments
-      const detailRes = await fetch(`/api/content/${selectedItem.id}?user_id=${user.id}`);
+      const detailRes = await fetch(`/api/content/${selectedItem.id}`);
       const data = await detailRes.json();
       setDetailComments(data.comments || []);
       setSelectedItem(data.content);
@@ -169,11 +166,11 @@ export default function HomePage() {
     await fetch('/api/comment-vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment_id: commentId, user_id: user.id }),
+      body: JSON.stringify({ comment_id: commentId }),
     });
     // Refresh comments
     if (selectedItem) {
-      const res = await fetch(`/api/content/${selectedItem.id}?user_id=${user.id}`);
+      const res = await fetch(`/api/content/${selectedItem.id}`);
       const data = await res.json();
       setDetailComments(data.comments || []);
     }

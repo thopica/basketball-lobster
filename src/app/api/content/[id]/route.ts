@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createRouteClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,11 +7,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Derive user from session cookie
+  let userId: string | null = null;
+  try {
+    const authClient = createRouteClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    userId = user?.id ?? null;
+  } catch {
+    // Not logged in
+  }
+
   const supabase = createAdminClient();
-  const userId = request.nextUrl.searchParams.get('user_id') || null;
 
   try {
-    // Fetch content item
     const { data: content, error: contentError } = await supabase
       .from('content')
       .select('*')
@@ -23,7 +31,6 @@ export async function GET(
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
-    // Fetch comments with user profiles
     const { data: comments, error: commentsError } = await supabase
       .from('comments')
       .select(`
@@ -37,7 +44,6 @@ export async function GET(
       console.error('Comments fetch error:', commentsError);
     }
 
-    // Check if user voted on this content
     let userVoted = false;
     if (userId) {
       const { data: vote } = await supabase
@@ -49,7 +55,6 @@ export async function GET(
       userVoted = !!vote;
     }
 
-    // Check which comments user voted on
     let commentVoteIds = new Set<string>();
     if (userId && comments?.length) {
       const { data: commentVotes } = await supabase
@@ -60,7 +65,6 @@ export async function GET(
       commentVoteIds = new Set((commentVotes || []).map((v) => v.comment_id));
     }
 
-    // Build threaded comment tree
     const commentMap = new Map();
     const rootComments: any[] = [];
 

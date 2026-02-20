@@ -13,7 +13,7 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
-const SORTS = ['hot', 'new', 'top'];
+const SORTS = ['hot', 'new'];
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'article', label: 'Articles' },
@@ -43,10 +43,22 @@ export default function Header({
                   Submit
                 </button>
                 <div className="dropdown dropdown-end">
-                  <label tabIndex={0} className="btn btn-sm btn-ghost font-semibold">
+                  <label tabIndex={0} className="btn btn-sm btn-ghost font-semibold gap-1.5">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt=""
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                        {(user.username || 'U')[0].toUpperCase()}
+                      </span>
+                    )}
                     {user.username || 'Account'}
                   </label>
-                  <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40">
+                  <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40 border border-base-300">
+                    <li><a href="/profile" className="no-underline">Profile</a></li>
                     <li><button onClick={onLogout}>Sign Out</button></li>
                   </ul>
                 </div>
