@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient();
   const results: any[] = [];
+  const startTime = Date.now();
+  const TIME_BUDGET_MS = 50_000; // Stop at 50s to leave margin for cleanup and response
+  let timedOut = false;
 
   try {
     // Get all active sources that are due for crawling
@@ -32,6 +35,11 @@ export async function POST(request: NextRequest) {
     }
 
     for (const source of sources as Source[]) {
+      if (Date.now() - startTime > TIME_BUDGET_MS) {
+        timedOut = true;
+        break;
+      }
+
       // Check if source is due for crawling (skip check when force=true)
       if (!force && source.last_crawled_at) {
         const lastCrawled = new Date(source.last_crawled_at).getTime();
@@ -57,6 +65,11 @@ export async function POST(request: NextRequest) {
         logEntry.items_found = crawledItems.length;
 
         for (const item of crawledItems) {
+          if (Date.now() - startTime > TIME_BUDGET_MS) {
+            timedOut = true;
+            break;
+          }
+
           if (!item.url || !item.headline) continue;
 
           // Step 2: Deduplicate (check if URL exists)
@@ -123,6 +136,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      timed_out: timedOut,
+      elapsed_ms: Date.now() - startTime,
       sources_processed: results.length,
       results,
     });
