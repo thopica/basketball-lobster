@@ -27,6 +27,9 @@ export default function AdminPage() {
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
+  const [crawlLoading, setCrawlLoading] = useState(false);
+  const [crawlResult, setCrawlResult] = useState<string | null>(null);
+  const [crawlCooldown, setCrawlCooldown] = useState(0);
 
   const authHeaders = useCallback(
     () => ({ Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }),
@@ -156,6 +159,45 @@ export default function AdminPage() {
     setSecret('');
   };
 
+  const handleCrawl = async () => {
+    setCrawlLoading(true);
+    setCrawlResult(null);
+    try {
+      const res = await fetch('/api/cron/crawl', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const totalNew = (data.results || []).reduce((sum: number, r: any) => sum + (r.items_new || 0), 0);
+        const totalPublished = (data.results || []).reduce((sum: number, r: any) => sum + (r.items_published || 0), 0);
+        setCrawlResult(`Crawled ${data.sources_processed} sources: ${totalNew} new items, ${totalPublished} published`);
+        fetchStats();
+        fetchItems();
+      } else {
+        setCrawlResult(`Error: ${data.error || 'Crawl failed'}`);
+      }
+    } catch {
+      setCrawlResult('Error: Network request failed');
+    } finally {
+      setCrawlLoading(false);
+      setCrawlCooldown(60);
+    }
+  };
+
+  useEffect(() => {
+    if (crawlCooldown <= 0) return;
+    const timer = setTimeout(() => setCrawlCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [crawlCooldown]);
+
+  useEffect(() => {
+    if (!crawlResult) return;
+    const timer = setTimeout(() => setCrawlResult(null), 10000);
+    return () => clearTimeout(timer);
+  }, [crawlResult]);
+
   // --- Password gate ---
   if (!authenticated) {
     return (
@@ -220,6 +262,24 @@ export default function AdminPage() {
             <a href="/" className="btn btn-sm btn-ghost">
               View Site
             </a>
+            <button
+              onClick={handleCrawl}
+              disabled={crawlLoading || crawlCooldown > 0}
+              className="btn btn-sm btn-primary"
+            >
+              {crawlLoading ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : crawlCooldown > 0 ? (
+                `Refresh Feed (${crawlCooldown}s)`
+              ) : (
+                'Refresh Feed'
+              )}
+            </button>
+            {crawlResult && (
+              <span className={`text-xs ${crawlResult.startsWith('Error') ? 'text-error' : 'text-success'}`}>
+                {crawlResult}
+              </span>
+            )}
             <button onClick={handleLogout} className="btn btn-sm btn-ghost text-error">
               Sign Out
             </button>

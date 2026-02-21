@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const body = await request.json().catch(() => ({}));
+  const force = body.force === true;
+
   const supabase = createAdminClient();
   const results: any[] = [];
 
@@ -29,8 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     for (const source of sources as Source[]) {
-      // Check if source is due for crawling
-      if (source.last_crawled_at) {
+      // Check if source is due for crawling (skip check when force=true)
+      if (!force && source.last_crawled_at) {
         const lastCrawled = new Date(source.last_crawled_at).getTime();
         const intervalMs = source.crawl_interval_minutes * 60 * 1000;
         if (Date.now() - lastCrawled < intervalMs) {
