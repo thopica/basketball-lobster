@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { AIResponse } from './types';
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
+  apiKey: process.env.ANTHROPIC_API_KEY?.trim(),
 });
 
 const CURATION_PROMPT = `You are a basketball content curator for an NBA fan community called Basketball Lobster.
