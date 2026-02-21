@@ -23,6 +23,44 @@ export async function GET() {
   return NextResponse.json({ profile, email: user.email });
 }
 
+export async function POST() {
+  const authClient = createRouteClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  if (existing) {
+    return NextResponse.json({ profile: existing });
+  }
+
+  const username =
+    user.user_metadata?.username ||
+    user.email?.split('@')[0] ||
+    `user_${user.id.slice(0, 8)}`;
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .upsert({ id: user.id, username }, { onConflict: 'id' })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ profile, created: true });
+}
+
 export async function PATCH(request: NextRequest) {
   const authClient = createRouteClient();
   const { data: { user } } = await authClient.auth.getUser();

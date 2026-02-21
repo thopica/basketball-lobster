@@ -29,18 +29,38 @@ export default function HomePage() {
 
   const supabase = createClient();
 
+  const loadProfile = useCallback(async (authUser: any) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (data) {
+      setProfile(data);
+      return;
+    }
+
+    // Profile missing -- ensure it exists via API (handles OAuth users
+    // whose database trigger may not have fired)
+    try {
+      const res = await fetch('/api/profile', { method: 'POST' });
+      if (res.ok) {
+        const { profile: created } = await res.json();
+        if (created) setProfile(created);
+      }
+    } catch {
+      // API unreachable -- leave profile null, Header fallback will handle display
+    }
+  }, [supabase]);
+
   // Auth listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (session?.user) {
           setUser(session.user);
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setProfile(data);
+          await loadProfile(session.user);
         } else {
           setUser(null);
           setProfile(null);
@@ -51,16 +71,11 @@ export default function HomePage() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        setProfile(data);
+        await loadProfile(session.user);
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfile]);
 
   // Fetch feed
   const fetchFeed = useCallback(async () => {
@@ -241,7 +256,7 @@ export default function HomePage() {
         onFilterChange={setFilter}
         onSubmitClick={() => setShowSubmit(true)}
         onAuthClick={(mode) => setShowAuth(mode)}
-        user={profile}
+        user={profile || (user ? { id: user.id, username: user.user_metadata?.username || user.email?.split('@')[0] || 'Account' } : null)}
         onLogout={handleLogout}
       />
 
