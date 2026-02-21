@@ -21,7 +21,9 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  await supabase.auth.signOut();
+  console.log('[signout] Route hit, cookies:', request.cookies.getAll().map(c => c.name));
+  const { error } = await supabase.auth.signOut();
+  console.log('[signout] signOut result:', error ? error.message : 'success');
 
   return response;
 }

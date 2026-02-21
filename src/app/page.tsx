@@ -203,8 +203,11 @@ export default function HomePage() {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    const res = await fetch('/auth/signout', { method: 'POST' });
-    window.location.href = res.redirected ? res.url : '/';
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/auth/signout';
+    document.body.appendChild(form);
+    form.submit();
   };
 
   // Detail view
