@@ -31,17 +31,23 @@ export async function GET(
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
-    const { data: comments, error: commentsError } = await supabase
+    const { data: rawComments } = await supabase
       .from('comments')
-      .select(`
-        *,
-        profile:profiles(id, username, avatar_url, karma)
-      `)
+      .select('*')
       .eq('content_id', params.id)
       .order('created_at', { ascending: true });
 
-    if (commentsError) {
-      console.error('Comments fetch error:', commentsError);
+    const comments = rawComments || [];
+
+    // Fetch profiles separately (no direct FK from comments to profiles)
+    let profileMap = new Map<string, any>();
+    if (comments.length > 0) {
+      const userIds = Array.from(new Set(comments.map((c) => c.user_id)));
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, karma')
+        .in('id', userIds);
+      (profiles || []).forEach((p) => profileMap.set(p.id, p));
     }
 
     let userVoted = false;
@@ -56,7 +62,7 @@ export async function GET(
     }
 
     let commentVoteIds = new Set<string>();
-    if (userId && comments?.length) {
+    if (userId && comments.length) {
       const { data: commentVotes } = await supabase
         .from('comment_votes')
         .select('comment_id')
@@ -68,9 +74,10 @@ export async function GET(
     const commentMap = new Map();
     const rootComments: any[] = [];
 
-    (comments || []).forEach((comment) => {
+    comments.forEach((comment) => {
       const enriched = {
         ...comment,
+        profile: profileMap.get(comment.user_id) || null,
         user_voted: commentVoteIds.has(comment.id),
         replies: [],
       };
