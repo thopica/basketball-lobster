@@ -134,13 +134,16 @@ export async function POST(request: NextRequest) {
 
 // Also allow GET for manual testing
 export async function GET(request: NextRequest) {
-  // For manual trigger, check for secret in query params
-  const secret = request.nextUrl.searchParams.get('secret');
-  if (secret !== process.env.CRON_SECRET) {
+  const authHeader = request.headers.get('authorization');
+  const querySecret = request.nextUrl.searchParams.get('secret');
+  const isAuthorized =
+    authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+    querySecret === process.env.CRON_SECRET;
+
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  
-  // Redirect to POST handler logic
+
   const newRequest = new NextRequest(request.url, {
     method: 'POST',
     headers: new Headers({
