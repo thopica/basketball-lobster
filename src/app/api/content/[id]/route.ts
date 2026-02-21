@@ -35,7 +35,7 @@ export async function GET(
       .from('comments')
       .select('*')
       .eq('content_id', params.id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false });
 
     const comments = rawComments || [];
 
