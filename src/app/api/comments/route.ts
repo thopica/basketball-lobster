@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         body: body.trim(),
         parent_id: parent_id || null,
       })
-      .select(`*, profile:profiles(id, username, avatar_url, karma)`)
+      .select()
       .single();
 
     if (error) {
